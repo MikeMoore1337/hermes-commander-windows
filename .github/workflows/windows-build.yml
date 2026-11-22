@@ -41,4 +41,22 @@ jobs:
           & (Join-Path $tools 'wix.exe') build 'deploy/h454/native-windows-msi/Package.wxs' -arch x64 -d "ServiceExe=$service" -d "WorkerExe=$(Join-Path $workerDir 'HermesCommanderNativeWorker.exe')" -out $msi
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $msi -PathType Leaf)) { throw 'MSI_BUILD_FAILED' }
           if ((Get-AuthenticodeSignature -LiteralPath $msi).Status -ne 'NotSigned') { throw 'UNEXPECTED_MSI_SIGNATURE' }
+          $evidence = Join-Path $env:RUNNER_TEMP 'h454-build-evidence'
+          New-Item -ItemType Directory -Path $evidence -ErrorAction Stop | Out-Null
+          $worker = Join-Path $workerDir 'HermesCommanderNativeWorker.exe'
+          & pyi-archive_viewer -b -r $worker | Set-Content -LiteralPath (Join-Path $evidence 'worker-archive-list.txt') -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw 'WORKER_INVENTORY_FAILED' }
+          Get-FileHash -Algorithm SHA256 -LiteralPath $service,$worker,$msi |
+            ForEach-Object { "$(Split-Path -Leaf $_.Path) $($_.Hash.ToLowerInvariant())" } |
+            Set-Content -LiteralPath (Join-Path $evidence 'candidate-sha256.txt') -Encoding utf8
+          python -c "import importlib.metadata as m,json; names=['pyinstaller','websockets','altgraph','packaging','pefile','pyinstaller-hooks-contrib','pywin32-ctypes','setuptools']; print(json.dumps([{'name':n,'version':m.version(n),'license_expression':m.metadata(n).get('License-Expression'),'license_files':m.metadata(n).get_all('License-File',[])} for n in names],indent=2))" |
+            Set-Content -LiteralPath (Join-Path $evidence 'python-build-distributions.json') -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw 'DISTRIBUTION_INVENTORY_FAILED' }
           Write-Output 'UNSIGNED_SYNTHETIC_BUILD=PASS; SIGNED_RELEASE=NOT_RUN; ARTIFACT_PUBLISHED=NO'
+      - name: Upload build metadata only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-build-metadata-not-binaries
+          path: ${{ runner.temp }}/h454-build-evidence/
+          retention-days: 7
+          if-no-files-found: error

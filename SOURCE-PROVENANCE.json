@@ -1,0 +1,91 @@
+{
+  "source_repository": "https://github.com/MikeMoore1337/hermes",
+  "source_commit": "13584072697c901ae1da575dee2898cfee890779",
+  "snapshot_commit": "99bc040f11d0807dc77ee175afe3a71b201fcbc0",
+  "files": [
+    {
+      "path": "control_center/__init__.py",
+      "source_git_blob": "41787b8e5954955873a76d89e83e837fbb882b04"
+    },
+    {
+      "path": "control_center/native_windows_policy.py",
+      "source_git_blob": "5caa83d244f71633a58b67da63c267e7b2e967b3"
+    },
+    {
+      "path": "deploy/h454/native-windows-msi/Package.wxs",
+      "source_git_blob": "562a2e33c5cc4aba4351634a87e68fd80cbdcaae"
+    },
+    {
+      "path": "deploy/h454/native-windows-service/HermesCommanderNativeService.csproj",
+      "source_git_blob": "a4d8abb9700124c27c5e7beedacbecdcb68efe65"
+    },
+    {
+      "path": "deploy/h454/native-windows-service/NativeHostAdmission.cs",
+      "source_git_blob": "f3d181158ad405bf6e4fd61baf6b4924dba795a3"
+    },
+    {
+      "path": "deploy/h454/native-windows-service/NativeWorkerSupervisor.cs",
+      "source_git_blob": "2cbe4c30328c3890dc843d7dd9eff76f351d93e0"
+    },
+    {
+      "path": "deploy/h454/native-windows-service/Program.cs",
+      "source_git_blob": "eabf02d7c4f1b1bed66b92d143a87dc4bc5cd096"
+    },
+    {
+      "path": "device_fabric/__init__.py",
+      "source_git_blob": "b0a593a1351215ce4f3c05b805faeb34bef0161a"
+    },
+    {
+      "path": "device_fabric/linux_native_files.py",
+      "source_git_blob": "8171e38dd19ea3aa351a696ea6189b2b69780610"
+    },
+    {
+      "path": "device_fabric/native_brc_enrollment.py",
+      "source_git_blob": "6ceffd491306026360e3355c1939586cd61df88c"
+    },
+    {
+      "path": "device_fabric/native_brc_status.py",
+      "source_git_blob": "53576289893181f46b3b720dbd2e913de08caece"
+    },
+    {
+      "path": "device_fabric/native_effect_grants.py",
+      "source_git_blob": "732470da527cfc07a2474486a8929752e76242dc"
+    },
+    {
+      "path": "device_fabric/native_install_preview.py",
+      "source_git_blob": "72b1e8661bb170db81412203f29deea40fddf56e"
+    },
+    {
+      "path": "device_fabric/windows_native_dpapi.py",
+      "source_git_blob": "c604a3bb0db6111829995cd99740e357a8abadd6"
+    },
+    {
+      "path": "device_fabric/windows_native_reenrollment.py",
+      "source_git_blob": "2279a2e91567d1d0c3078a9025d2c0aff2e954c0"
+    },
+    {
+      "path": "scripts/h15_native_windows_mcp_stdio.py",
+      "source_git_blob": "6ac1dd2e4f084e349fd279a36733c3866dc079cb"
+    },
+    {
+      "path": "scripts/h15_native_windows_outbound.py",
+      "source_git_blob": "1fd08eeffc748871ee3729a8caf56e6a993515b0"
+    },
+    {
+      "path": "scripts/h15_native_windows_read.py",
+      "source_git_blob": "865cf3b8c9db62f191f6d7fc27883234d11a5963"
+    },
+    {
+      "path": "scripts/h454_native_win32_worker.py",
+      "source_git_blob": "245714f616f8bc4ee69c0b92bcc19d81341117bb"
+    },
+    {
+      "path": "scripts/h454_package_win32_worker.ps1",
+      "source_git_blob": "0edc16291b927b04022fe11fe3e3d5b06d51b04d"
+    },
+    {
+      "path": "scripts/h454_verify_signed_windows_msi.ps1",
+      "source_git_blob": "8ff9e2af50b72f4cb5964102f07e7a056e852886"
+    }
+  ]
+}
