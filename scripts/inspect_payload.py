@@ -53,6 +53,7 @@ def inspect_dotnet(data):
     entries = []
     names = set()
     runtime_config = None
+    dependency_libraries = None
     for _ in range(count):
         if pos + 25 > len(data):
             raise ValueError("truncated manifest")
@@ -70,8 +71,16 @@ def inspect_dotnet(data):
             if runtime_config is not None or size > 1024 * 1024:
                 raise ValueError("invalid runtime configuration")
             runtime_config = json.loads(data[start:start + size])
+        if name.endswith(".deps.json") and not compressed:
+            if dependency_libraries is not None or size > 4 * 1024 * 1024:
+                raise ValueError("invalid dependency metadata")
+            libraries = json.loads(data[start:start + size]).get("libraries")
+            if not isinstance(libraries, dict):
+                raise ValueError("invalid dependency libraries")
+            dependency_libraries = sorted(libraries)
         entries.append({"name": name, "type": kind, "size": size, "compressed": compressed, "sha256": digest})
-    return {"format": f"{major}.{minor}", "runtime_config": runtime_config, "entries": entries}
+    return {"format": f"{major}.{minor}", "runtime_config": runtime_config,
+            "dependency_libraries": dependency_libraries, "entries": entries}
 
 
 def inspect_worker(path, expected):

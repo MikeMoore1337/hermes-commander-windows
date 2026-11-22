@@ -33,6 +33,10 @@ class BundleInspectionTests(unittest.TestCase):
         result = inspect_dotnet(bundle(b"app.runtimeconfig.json", b'{"runtimeOptions":{"tfm":"net10.0"}}'))
         self.assertEqual(result["runtime_config"]["runtimeOptions"]["tfm"], "net10.0")
 
+    def test_reads_actual_dependency_identifiers(self):
+        result = inspect_dotnet(bundle(b"app.deps.json", b'{"libraries":{"runtimepack/10.0.0":{}}}'))
+        self.assertEqual(result["dependency_libraries"], ["runtimepack/10.0.0"])
+
     def test_worker_reports_both_matching_and_mismatching_inputs(self):
         reader = types.ModuleType("PyInstaller.archive.readers")
 
