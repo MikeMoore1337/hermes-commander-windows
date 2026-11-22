@@ -36,6 +36,22 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'WHEEL_DOWNLOAD_FAILED' }
           python -B scripts/audit_build_wheels.py $wheels (Join-Path $evidence 'wheel-notices')
           if ($LASTEXITCODE -ne 0) { throw 'WHEEL_AUDIT_FAILED' }
+          $wheelNotices = Join-Path $evidence 'wheel-notices'
+          $manifest = Get-Content -Raw -LiteralPath (Join-Path $wheelNotices 'wheels.json') | ConvertFrom-Json
+          for ($i = 0; $i -lt $manifest.Count; $i++) {
+            $wheelDir = [IO.Path]::GetFileNameWithoutExtension($manifest[$i].wheel)
+            if ($wheelDir -cnotmatch '^[A-Za-z0-9_.-]+$') { throw 'UNSAFE_WHEEL_NAME' }
+            for ($j = 0; $j -lt $manifest[$i].license_paths.Count; $j++) {
+              $name = [IO.Path]::GetFileName($manifest[$i].license_paths[$j].Replace('/', '\'))
+              if ($name -cnotmatch '^[A-Za-z0-9_.-]+$') { throw 'UNSAFE_NOTICE_NAME' }
+              $stored = Join-Path (Join-Path 'third_party_notices/wheels' $wheelDir) $name
+              $actual = Join-Path $wheelNotices ('{0:D2}-{1:D2}.txt' -f $i, $j)
+              if (-not (Test-Path -LiteralPath $stored -PathType Leaf) -or
+                  (Get-FileHash -LiteralPath $stored).Hash -cne (Get-FileHash -LiteralPath $actual).Hash) {
+                throw 'WHEEL_NOTICE_MISMATCH'
+              }
+            }
+          }
           $env:PIP_NO_INDEX = '1'
           $env:PIP_FIND_LINKS = $wheels
           $out = Join-Path $env:RUNNER_TEMP 'h454-standalone-service'
