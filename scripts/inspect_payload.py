@@ -145,7 +145,11 @@ def map_worker_sources(entries, toc_text, roots):
                 resolved = path.resolve(strict=True)
                 category = next((label for label, root in roots if resolved.is_relative_to(root.resolve())), None)
                 if not category:
-                    diagnostics.append({"category": "unapproved-root", "status": "not-read"})
+                    top = resolved.parts[1].casefold() if len(resolved.parts) > 1 else "unknown"
+                    known = {"windows", "users", "program files", "program files (x86)",
+                             "programdata", "hostedtoolcache", "a", "actions", "tools"}
+                    diagnostics.append({"category": "unapproved-root", "status": "not-read",
+                                        "top_level": top if top in known else "other"})
                     continue
                 if resolved.suffix.lower() not in {".dll", ".pyd"} or resolved.stat().st_size > MAX_ENTRY:
                     diagnostics.append({"category": category, "status": "unsafe-input"})
