@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -8,6 +9,12 @@ from scripts.audit_build_wheels import audit
 
 
 class WheelAuditTests(unittest.TestCase):
+    def test_openssl_license_matches_upstream_git_blob(self):
+        root = Path(__file__).resolve().parents[1]
+        content = (root / "third_party_notices/openssl-3.5.9/LICENSE.txt").read_bytes()
+        digest = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
+        self.assertEqual(digest, "49cc83d2ee29d13453188217f0e4edd70c7f842f")
+
     def test_preserves_exact_notice_and_does_not_extract_other_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
