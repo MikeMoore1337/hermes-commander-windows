@@ -55,11 +55,15 @@ class BundleInspectionTests(unittest.TestCase):
         modules = {"PyInstaller": types.ModuleType("PyInstaller"),
                    "PyInstaller.archive": types.ModuleType("PyInstaller.archive"),
                    "PyInstaller.archive.readers": reader}
-        with patch.dict(sys.modules, modules):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(sys.modules, modules):
+            extracted = Path(tmp) / "files"
             result = inspect_worker("candidate.exe", [
                 {"name": "python314.dll", "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"},
                 {"name": "missing.dll", "sha256": "0" * 64},
-            ])
+            ], extracted)
+            self.assertEqual((extracted / (result["entries"][0]["sha256"] + ".dll")).read_bytes(), b"abc")
+            with self.assertRaises(FileExistsError):
+                inspect_worker("candidate.exe", [], extracted)
         self.assertEqual([x["matches"] for x in result["input_comparisons"]], [True, False])
 
     def test_source_mapping_requires_matching_bytes_and_an_approved_root(self):

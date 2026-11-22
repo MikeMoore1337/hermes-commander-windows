@@ -85,10 +85,12 @@ def inspect_dotnet(data):
             "dependency_libraries": dependency_libraries, "entries": entries}
 
 
-def inspect_worker(path, expected):
+def inspect_worker(path, expected, extracted=None):
     from PyInstaller.archive.readers import CArchiveReader
 
     reader = CArchiveReader(str(path))
+    if extracted is not None:
+        extracted.mkdir()
     entries = []
     for name, (_, _, unpacked, _, kind) in reader.toc.items():
         safe = _safe_name(name)
@@ -99,7 +101,12 @@ def inspect_worker(path, expected):
         content = reader.extract(name)
         if len(content) != unpacked:
             raise ValueError("invalid worker entry size")
-        entries.append({"name": safe, "type": kind, "size": len(content), "sha256": hashlib.sha256(content).hexdigest()})
+        digest = hashlib.sha256(content).hexdigest()
+        if extracted is not None:
+            output = extracted / (digest + Path(safe).suffix.lower())
+            if not output.exists():
+                output.write_bytes(content)
+        entries.append({"name": safe, "type": kind, "size": len(content), "sha256": digest})
     comparisons = []
     for item in expected:
         name = PurePosixPath(item["name"].replace("\\", "/")).name
@@ -190,13 +197,13 @@ def map_dotnet_sources(entries, pack_dir):
     return results
 
 
-def main(service, worker, inputs, toc, pack_dir, output):
+def main(service, worker, inputs, toc, pack_dir, extracted, output):
     service_path, worker_path = Path(service), Path(worker)
     if service_path.stat().st_size > MAX_BINARY or worker_path.stat().st_size > MAX_BINARY:
         raise ValueError("candidate too large")
     report = {
         "dotnet_bundle": inspect_dotnet(service_path.read_bytes()),
-        "worker": inspect_worker(worker_path, json.loads(Path(inputs).read_text(encoding="utf-8-sig"))),
+        "worker": inspect_worker(worker_path, json.loads(Path(inputs).read_text(encoding="utf-8-sig")), Path(extracted)),
     }
     roots = [("venv", Path(sys.prefix)), ("python", Path(sys.base_prefix))]
     for key, label in (("SystemRoot", "windows"), ("ProgramFiles", "program_files"),
@@ -213,6 +220,6 @@ def main(service, worker, inputs, toc, pack_dir, output):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 7:
-        raise SystemExit("expected service, worker, input metadata, TOC, runtime pack, and output")
+    if len(sys.argv) != 8:
+        raise SystemExit("expected service, worker, input metadata, TOC, runtime pack, extraction directory, and output")
     main(*sys.argv[1:])

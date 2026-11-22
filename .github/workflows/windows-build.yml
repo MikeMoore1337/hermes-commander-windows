@@ -140,8 +140,13 @@ jobs:
           @($files | ForEach-Object { [pscustomobject]@{name = [IO.Path]::GetRelativePath($extract, $_.FullName); sha256 = (Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant()} }) |
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'msi-admin-files.json') -Encoding utf8
           $analysisToc = Join-Path $env:RUNNER_TEMP 'h454-win32-pyinstaller\work\HermesCommanderNativeWorker\Analysis-00.toc'
-          python -B scripts/inspect_payload.py $serviceInMsi[0].FullName $workerInMsi[0].FullName (Join-Path $evidence 'python-native-inputs.json') $analysisToc $packDir (Join-Path $evidence 'embedded-payload.json')
+          $nativeFiles = Join-Path $env:RUNNER_TEMP 'h454-worker-native-files'
+          python -B scripts/inspect_payload.py $serviceInMsi[0].FullName $workerInMsi[0].FullName (Join-Path $evidence 'python-native-inputs.json') $analysisToc $packDir $nativeFiles (Join-Path $evidence 'embedded-payload.json')
           if ($LASTEXITCODE -ne 0) { throw 'EMBEDDED_PAYLOAD_INSPECTION_FAILED' }
+          @(Get-ChildItem -LiteralPath $nativeFiles -File | ForEach-Object {
+            $signature = Get-AuthenticodeSignature -LiteralPath $_.FullName
+            [pscustomobject]@{ sha256 = $_.BaseName; status = $signature.Status.ToString(); signer = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { $null }; company = $_.VersionInfo.CompanyName; product = $_.VersionInfo.ProductName; version = $_.VersionInfo.FileVersion }
+          }) | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $evidence 'worker-native-signatures.json') -Encoding utf8
           $payload = Get-Content -Raw -LiteralPath (Join-Path $evidence 'embedded-payload.json') | ConvertFrom-Json
           $extractedPack = @($payload.dotnet_bundle.dependency_libraries | Where-Object { $_ -cmatch '^runtimepack\.Microsoft\.NETCore\.App\.Runtime\.win-x64/[0-9.]+$' })
           if ($extractedPack.Count -ne 1 -or $extractedPack[0] -cne $pack[0]) { throw 'RUNTIMEPACK_IDENTITY_MISMATCH' }
