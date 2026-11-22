@@ -138,18 +138,28 @@ def map_worker_sources(entries, toc_text, roots):
     for entry in entries:
         candidates = by_name.get(entry["name"].casefold(), [])
         matches = []
+        diagnostics = []
         for raw in candidates:
             path = Path(raw)
             try:
                 resolved = path.resolve(strict=True)
                 category = next((label for label, root in roots if resolved.is_relative_to(root.resolve())), None)
-                if not category or resolved.suffix.lower() not in {".dll", ".pyd"} or resolved.stat().st_size > MAX_ENTRY:
+                if not category:
+                    diagnostics.append({"category": "unapproved-root", "status": "not-read"})
+                    continue
+                if resolved.suffix.lower() not in {".dll", ".pyd"} or resolved.stat().st_size > MAX_ENTRY:
+                    diagnostics.append({"category": category, "status": "unsafe-input"})
                     continue
                 if hashlib.sha256(resolved.read_bytes()).hexdigest() == entry["sha256"]:
                     matches.append(category)
+                    diagnostics.append({"category": category, "status": "match"})
+                else:
+                    diagnostics.append({"category": category, "status": "different-bytes"})
             except (OSError, ValueError):
+                diagnostics.append({"category": "unknown", "status": "unavailable"})
                 continue
-        results.append({"name": entry["name"], "toc_candidates": len(candidates), "matching_sources": sorted(set(matches))})
+        results.append({"name": entry["name"], "toc_candidates": len(candidates),
+                        "matching_sources": sorted(set(matches)), "diagnostics": diagnostics})
     return results
 
 

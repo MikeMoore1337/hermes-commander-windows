@@ -76,9 +76,11 @@ class BundleInspectionTests(unittest.TestCase):
             self.assertEqual(mapped[0]["matching_sources"], ["python"])
             self.assertEqual(mapped[1]["matching_sources"], [])
             self.assertEqual(map_worker_sources(entries, toc, [("other", root / "elsewhere")])[0]["matching_sources"], [])
+            self.assertEqual(map_worker_sources(entries, toc, [("other", root / "elsewhere")])[0]["diagnostics"][0]["status"], "not-read")
             self.assertTrue(map_dotnet_sources(entries, allowed)[0]["matches_pack"])
             source.write_bytes(b"changed")
             self.assertFalse(map_dotnet_sources(entries, allowed)[0]["matches_pack"])
+            self.assertEqual(map_worker_sources(entries, toc, [("python", allowed)])[0]["diagnostics"][0]["status"], "different-bytes")
 
 
 if __name__ == "__main__":
