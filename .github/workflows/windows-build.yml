@@ -1,0 +1,44 @@
+name: Windows unsigned build verification
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.14'
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: '10.0.403'
+      - name: Validate boundaries and build unsigned candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -B -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'BOUNDARY_TESTS_FAILED' }
+          $out = Join-Path $env:RUNNER_TEMP 'h454-standalone-service'
+          dotnet publish 'deploy/h454/native-windows-service/HermesCommanderNativeService.csproj' --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false "-p:SourceRevisionId=$env:GITHUB_SHA" -o $out
+          if ($LASTEXITCODE -ne 0) { throw 'SERVICE_BUILD_FAILED' }
+          $service = Join-Path $out 'HermesCommanderNativeService.exe'
+          $probe = Start-Process -FilePath $service -ArgumentList @('--self-test', $env:GITHUB_SHA) -Wait -PassThru -NoNewWindow
+          if ($probe.ExitCode -ne 0) { throw 'SERVICE_SELF_TEST_FAILED' }
+          $workerDir = Join-Path $env:RUNNER_TEMP 'h454-standalone-worker'
+          & ./scripts/h454_package_win32_worker.ps1 -ExpectedSha $env:GITHUB_SHA -Destination $workerDir
+          if ($LASTEXITCODE -ne 0) { throw 'WORKER_BUILD_FAILED' }
+          $tools = Join-Path $env:RUNNER_TEMP 'h454-standalone-wix'
+          dotnet tool install wix --version 6.0.0 --tool-path $tools
+          if ($LASTEXITCODE -ne 0) { throw 'WIX_INSTALL_FAILED' }
+          $msi = Join-Path $out 'HermesCommanderNative-Disabled.msi'
+          & (Join-Path $tools 'wix.exe') build 'deploy/h454/native-windows-msi/Package.wxs' -arch x64 -d "ServiceExe=$service" -d "WorkerExe=$(Join-Path $workerDir 'HermesCommanderNativeWorker.exe')" -out $msi
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $msi -PathType Leaf)) { throw 'MSI_BUILD_FAILED' }
+          if ((Get-AuthenticodeSignature -LiteralPath $msi).Status -ne 'NotSigned') { throw 'UNEXPECTED_MSI_SIGNATURE' }
+          Write-Output 'UNSIGNED_SYNTHETIC_BUILD=PASS; SIGNED_RELEASE=NOT_RUN; ARTIFACT_PUBLISHED=NO'
