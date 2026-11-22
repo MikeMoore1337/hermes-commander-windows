@@ -25,3 +25,9 @@ Python, PyInstaller, websockets, WiX and .NET have their own licenses. Their
 terms are not replaced by this repository's MIT grant; a distributable package
 must include all notices required by its actual resolved dependencies. On
 Windows, .NET product distributions have their own license terms.
+
+For a future signed build, `scripts/h454_verify_signed_windows_msi.ps1` requires
+the SHA-256 of the notices archive from the trusted build inputs. It verifies
+the archive inside the signed MSI alongside the installer and executable
+signatures; this check does not establish redistribution rights or provider
+approval. The verifier runs only on a disposable Windows CI runner.

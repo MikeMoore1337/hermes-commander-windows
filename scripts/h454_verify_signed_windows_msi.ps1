@@ -3,9 +3,11 @@
 param(
     [Parameter(Mandatory=$true)][string]$MsiPath,
     [Parameter(Mandatory=$true)][string]$ExpectedSha,
+    [Parameter(Mandatory=$true)][string]$ExpectedNoticesSha256,
     [Parameter(Mandatory=$true)][string]$OutputDir
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'h454_verify_notices.ps1')
 function Deny([string]$reason) { throw ('H454_SIGNPATH_RELEASE_HOLD_' + $reason) }
 try {
     if ($env:RUNNER_OS -ne 'Windows' -or
@@ -37,15 +39,16 @@ try {
     $quotedOutput = 'TARGETDIR="' + $output + '"'
     $arguments = @('/a', $quotedMsi, '/qn', '/norestart',
                    $quotedOutput, 'REBOOT=ReallySuppress')
-    $run = Start-Process -FilePath $windowsInstaller -ArgumentList $arguments -PassThru -Wait -NoNewWindow
+    $run = Start-Process -FilePath $windowsInstaller -ArgumentList $arguments -PassThru -Wait -WindowStyle Hidden
     if ($run.ExitCode -ne 0) { Deny 'EXTRACT_FAILED' }
+    Assert-H454Notices $output $ExpectedNoticesSha256
     $executables = @(Get-ChildItem -LiteralPath $output -Recurse -File |
         Where-Object { $_.Name -ceq 'HermesCommanderNativeService.exe' })
     if ($executables.Count -ne 1) { Deny 'EXACT_EXE_MISSING' }
     $exe = $executables[0].FullName
     $exeThumbprint = VerifyAuthenticode $exe
     if ($exeThumbprint -cne $msiThumbprint) { Deny 'PUBLISHER_MISMATCH' }
-    $selftest = Start-Process -FilePath $exe -ArgumentList @('--self-test', $ExpectedSha) -PassThru -Wait
+    $selftest = Start-Process -FilePath $exe -ArgumentList @('--self-test', $ExpectedSha) -PassThru -Wait -WindowStyle Hidden
     if ($selftest.ExitCode -ne 0) { Deny 'SOURCE_SHA_MISMATCH' }
     $workers = @(Get-ChildItem -LiteralPath $output -Recurse -File |
         Where-Object { $_.Name -ceq 'HermesCommanderNativeWorker.exe' })
@@ -55,7 +58,7 @@ try {
     if ($workerThumbprint -cne $msiThumbprint) { Deny 'WORKER_PUBLISHER_MISMATCH' }
     # The host runner is not the owner virtual service identity.
     # This worker must refuse before any original-file/token access.
-    $workerRun = Start-Process -FilePath $worker -ArgumentList @('--run-once', '--release-sha', $ExpectedSha) -PassThru -Wait -NoNewWindow
+    $workerRun = Start-Process -FilePath $worker -ArgumentList @('--run-once', '--release-sha', $ExpectedSha) -PassThru -Wait -WindowStyle Hidden
     if ($workerRun.ExitCode -ne 2) { Deny 'WORKER_WRONG_SID_GATE_MISSING' }
     $receipt = @{
         schema = 'h454-signed-msi-receipt-v1'
