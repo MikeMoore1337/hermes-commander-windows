@@ -1,6 +1,8 @@
 """Inventory the actual unsigned candidate without running or distributing it."""
+import ast
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import struct
 import sys
@@ -109,7 +111,67 @@ def inspect_worker(path, expected):
     return {"entries": entries, "input_comparisons": comparisons}
 
 
-def main(service, worker, inputs, output):
+def _toc_rows(value, depth=0):
+    if depth > 64:
+        raise ValueError("TOC nesting too deep")
+    if isinstance(value, (tuple, list)):
+        if len(value) == 3 and all(isinstance(x, str) for x in value) and value[2] in {"BINARY", "EXTENSION"}:
+            yield value
+        else:
+            for child in value:
+                yield from _toc_rows(child, depth + 1)
+    elif isinstance(value, dict):
+        for child in value.values():
+            yield from _toc_rows(child, depth + 1)
+
+
+def map_worker_sources(entries, toc_text, roots):
+    if len(toc_text) > 16 * 1024 * 1024:
+        raise ValueError("TOC too large")
+    rows = list(_toc_rows(ast.literal_eval(toc_text)))
+    if len(rows) > 10000:
+        raise ValueError("too many TOC entries")
+    by_name = {}
+    for dest, source, _ in rows:
+        by_name.setdefault(_safe_name(dest).casefold(), []).append(source)
+    results = []
+    for entry in entries:
+        candidates = by_name.get(entry["name"].casefold(), [])
+        matches = []
+        for raw in candidates:
+            path = Path(raw)
+            try:
+                resolved = path.resolve(strict=True)
+                category = next((label for label, root in roots if resolved.is_relative_to(root.resolve())), None)
+                if not category or resolved.suffix.lower() not in {".dll", ".pyd"} or resolved.stat().st_size > MAX_ENTRY:
+                    continue
+                if hashlib.sha256(resolved.read_bytes()).hexdigest() == entry["sha256"]:
+                    matches.append(category)
+            except (OSError, ValueError):
+                continue
+        results.append({"name": entry["name"], "toc_candidates": len(candidates), "matching_sources": sorted(set(matches))})
+    return results
+
+
+def map_dotnet_sources(entries, pack_dir):
+    candidates = {}
+    root = pack_dir.resolve(strict=True)
+    for path in pack_dir.rglob("*.dll"):
+        if (path.is_file() and not path.is_symlink() and path.resolve().is_relative_to(root)
+                and path.stat().st_size <= MAX_ENTRY):
+            candidates.setdefault(path.name.casefold(), []).append(path)
+    results = []
+    for entry in entries:
+        if not entry["name"].lower().endswith(".dll"):
+            continue
+        name = PurePosixPath(entry["name"]).name
+        paths = candidates.get(name.casefold(), [])
+        matched = bool(entry["sha256"]) and any(hashlib.sha256(p.read_bytes()).hexdigest() == entry["sha256"] for p in paths)
+        results.append({"name": name, "pack_candidates": len(paths), "matches_pack": matched})
+    return results
+
+
+def main(service, worker, inputs, toc, pack_dir, output):
     service_path, worker_path = Path(service), Path(worker)
     if service_path.stat().st_size > MAX_BINARY or worker_path.stat().st_size > MAX_BINARY:
         raise ValueError("candidate too large")
@@ -117,10 +179,19 @@ def main(service, worker, inputs, output):
         "dotnet_bundle": inspect_dotnet(service_path.read_bytes()),
         "worker": inspect_worker(worker_path, json.loads(Path(inputs).read_text(encoding="utf-8-sig"))),
     }
+    roots = [("venv", Path(sys.prefix)), ("python", Path(sys.base_prefix))]
+    for key, label in (("SystemRoot", "windows"), ("ProgramFiles", "program_files"),
+                       ("ProgramFiles(x86)", "program_files_x86"), ("RUNNER_TEMP", "runner_temp")):
+        if os.environ.get(key):
+            roots.append((label, Path(os.environ[key])))
+    report["worker"]["source_comparisons"] = map_worker_sources(
+        report["worker"]["entries"], Path(toc).read_text(encoding="utf-8"), roots)
+    report["dotnet_bundle"]["pack_comparisons"] = map_dotnet_sources(
+        report["dotnet_bundle"]["entries"], Path(pack_dir))
     Path(output).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        raise SystemExit("expected service, worker, input metadata, and output")
+    if len(sys.argv) != 7:
+        raise SystemExit("expected service, worker, input metadata, TOC, runtime pack, and output")
     main(*sys.argv[1:])

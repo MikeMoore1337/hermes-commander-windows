@@ -36,6 +36,9 @@ that its worker and service match the just-built inputs, and inventories
 embedded .NET and PyInstaller files without uploading binaries. Input hashes,
 archive inventories and individual license texts are evidence for review;
 they do not themselves establish redistribution rights or provider approval.
+The report also compares embedded DLL hashes with the runtime pack and the
+PyInstaller analysis inputs. A missing or unmatched source remains unknown;
+matching bytes alone do not determine license terms.
 
 The test MSI now includes `ThirdPartyNotices.zip`, assembled from the pinned
 source notices, installed Python and .NET SDK notices, and the exact runtime

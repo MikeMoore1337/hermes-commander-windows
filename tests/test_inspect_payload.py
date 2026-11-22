@@ -1,10 +1,12 @@
 import struct
 import sys
+import tempfile
 import types
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-from scripts.inspect_payload import inspect_dotnet, inspect_worker
+from scripts.inspect_payload import inspect_dotnet, inspect_worker, map_dotnet_sources, map_worker_sources
 
 
 def bundle(name=b"test.dll", content=b"abc", *, start=40, compressed=0):
@@ -59,6 +61,24 @@ class BundleInspectionTests(unittest.TestCase):
                 {"name": "missing.dll", "sha256": "0" * 64},
             ])
         self.assertEqual([x["matches"] for x in result["input_comparisons"]], [True, False])
+
+    def test_source_mapping_requires_matching_bytes_and_an_approved_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            allowed = root / "allowed"
+            allowed.mkdir()
+            source = allowed / "input.dll"
+            source.write_bytes(b"abc")
+            digest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+            entries = [{"name": "input.dll", "sha256": digest}, {"name": "missing.dll", "sha256": digest}]
+            toc = repr(([('input.dll', str(source), 'BINARY')],))
+            mapped = map_worker_sources(entries, toc, [("python", allowed)])
+            self.assertEqual(mapped[0]["matching_sources"], ["python"])
+            self.assertEqual(mapped[1]["matching_sources"], [])
+            self.assertEqual(map_worker_sources(entries, toc, [("other", root / "elsewhere")])[0]["matching_sources"], [])
+            self.assertTrue(map_dotnet_sources(entries, allowed)[0]["matches_pack"])
+            source.write_bytes(b"changed")
+            self.assertFalse(map_dotnet_sources(entries, allowed)[0]["matches_pack"])
 
 
 if __name__ == "__main__":
