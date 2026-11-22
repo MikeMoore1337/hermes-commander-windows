@@ -15,7 +15,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: '3.14'
+          python-version: '3.14.10'
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: '10.0.403'
@@ -65,6 +65,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'DISTRIBUTION_INVENTORY_FAILED' }
           $pythonHome = (python -c "import sys; print(sys.base_prefix)").Trim()
           if ($LASTEXITCODE -ne 0 -or -not $env:DOTNET_ROOT) { throw 'RUNTIME_NOTICE_PATH_FAILED' }
+          python -c "import json,ssl,sys; print(json.dumps({'python':sys.version.split()[0],'openssl':ssl.OPENSSL_VERSION},indent=2))" |
+            Set-Content -LiteralPath (Join-Path $evidence 'python-runtime-versions.json') -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw 'RUNTIME_VERSION_FAILED' }
+          $nativeInputs = @('python314.dll', 'vcruntime140.dll', 'vcruntime140_1.dll', 'DLLs\libcrypto-3.dll', 'DLLs\libssl-3.dll', 'DLLs\libffi-8.dll')
+          $nativeRecords = foreach ($name in $nativeInputs) {
+            $file = Join-Path $pythonHome $name
+            if (Test-Path -LiteralPath $file -PathType Leaf) {
+              $item = Get-Item -LiteralPath $file
+              [pscustomobject]@{ name = $name; sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash.ToLowerInvariant(); file_version = $item.VersionInfo.FileVersion }
+            } else {
+              [pscustomobject]@{ name = $name; sha256 = $null; file_version = $null }
+            }
+          }
+          $nativeRecords | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'python-native-inputs.json') -Encoding utf8
           $runtimeNotices = @(
             @{ Source = (Join-Path $pythonHome 'LICENSE.txt'); Name = 'python-license.txt' },
             @{ Source = (Join-Path $env:DOTNET_ROOT 'LICENSE.txt'); Name = 'dotnet-license.txt' },

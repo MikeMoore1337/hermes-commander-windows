@@ -7,6 +7,7 @@ Their licenses are independent of the source license:
 | Dependency | Reference | Role |
 | --- | --- | --- |
 | Python | https://docs.python.org/3/license.html | Interpreter bundled in the worker |
+| OpenSSL | https://www.openssl.org/source/license.html | Native libraries bundled with Python |
 | PyInstaller 6.22.3 | https://github.com/pyinstaller/pyinstaller/blob/v6.22.3/COPYING.txt | Build tool and bootloader; GPL with exception |
 | websockets 17.2 | https://github.com/python-websockets/websockets/blob/17.2/LICENSE | Worker dependency, BSD-3-Clause |
 | WiX 6.0.0 | https://github.com/wixtoolset/wix/blob/v6.0.0/LICENSE.TXT | Installer build tool |
