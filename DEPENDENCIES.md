@@ -8,6 +8,7 @@ Their licenses are independent of the source license:
 | --- | --- | --- |
 | Python | https://docs.python.org/3/license.html | Interpreter bundled in the worker |
 | OpenSSL | https://www.openssl.org/source/license.html | Native libraries bundled with Python |
+| Microsoft Visual C++ runtime | https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files | Native DLLs bundled with Python |
 | PyInstaller 6.22.3 | https://github.com/pyinstaller/pyinstaller/blob/v6.22.3/COPYING.txt | Build tool and bootloader; GPL with exception |
 | websockets 17.2 | https://github.com/python-websockets/websockets/blob/17.2/LICENSE | Worker dependency, BSD-3-Clause |
 | WiX 6.0.0 | https://github.com/wixtoolset/wix/blob/v6.0.0/LICENSE.TXT | Installer build tool |
@@ -20,7 +21,18 @@ the SignPath system-library exception for the Windows .NET distribution has not
 been determined. The workflow verifies the committed wheel hashes and records
 exact notice files from the wheelhouse used in its isolated build. Copies of
 the eight pinned wheels' notices are preserved in `third_party_notices/wheels`.
-It also
-records available Python and .NET runtime notices and reports missing ones;
+It also records available Python and .NET runtime notices and reports missing ones;
 this evidence does not establish completeness for the packaged runtimes or
 native DLLs. It does not sign or publish its binary output.
+
+Microsoft documents Visual C++ runtime redistribution as subject to Visual
+Studio licensing and its terms. Python's Windows license also contains
+additional Microsoft distributable-code conditions. The applicable rights
+for the exact runtime copies and SignPath's system-library exception remain
+unverified; an MIT source license does not settle those questions.
+
+The CI performs administrative MSI extraction on a hosted runner, verifies
+that its worker and service match the just-built inputs, and inventories
+embedded .NET and PyInstaller files without uploading binaries. Input hashes,
+archive inventories and individual license texts are evidence for review;
+they do not themselves establish redistribution rights or provider approval.

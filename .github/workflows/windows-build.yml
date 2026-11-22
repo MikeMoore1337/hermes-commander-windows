@@ -110,6 +110,21 @@ jobs:
               Add-Content -LiteralPath (Join-Path $evidence 'missing-runtime-notices.txt') -Value $notice.Name
             }
           }
+          $extract = Join-Path $env:RUNNER_TEMP 'h454-msi-admin-extract'
+          $unpack = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\msiexec.exe') -ArgumentList @('/a', $msi, '/qn', '/norestart', "TARGETDIR=$extract") -WindowStyle Hidden -Wait -PassThru
+          if ($unpack.ExitCode -ne 0) { throw 'MSI_ADMIN_EXTRACTION_FAILED' }
+          $files = @(Get-ChildItem -LiteralPath $extract -Recurse -File)
+          $serviceInMsi = @($files | Where-Object { $_.Name -ceq 'HermesCommanderNativeService.exe' })
+          $workerInMsi = @($files | Where-Object { $_.Name -ceq 'HermesCommanderNativeWorker.exe' })
+          if ($serviceInMsi.Count -ne 1 -or $workerInMsi.Count -ne 1 -or
+              (Get-FileHash -LiteralPath $serviceInMsi[0].FullName).Hash -cne (Get-FileHash -LiteralPath $service).Hash -or
+              (Get-FileHash -LiteralPath $workerInMsi[0].FullName).Hash -cne (Get-FileHash -LiteralPath $worker).Hash) {
+            throw 'MSI_PAYLOAD_MISMATCH'
+          }
+          @($files | ForEach-Object { [pscustomobject]@{name = [IO.Path]::GetRelativePath($extract, $_.FullName); sha256 = (Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant()} }) |
+            ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'msi-admin-files.json') -Encoding utf8
+          python -B scripts/inspect_payload.py $serviceInMsi[0].FullName $workerInMsi[0].FullName (Join-Path $evidence 'python-native-inputs.json') (Join-Path $evidence 'embedded-payload.json')
+          if ($LASTEXITCODE -ne 0) { throw 'EMBEDDED_PAYLOAD_INSPECTION_FAILED' }
           Write-Output 'UNSIGNED_SYNTHETIC_BUILD=PASS; SIGNED_RELEASE=NOT_RUN; ARTIFACT_PUBLISHED=NO'
       - name: Upload build metadata only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
