@@ -63,6 +63,20 @@ jobs:
           python -c "import importlib.metadata as m,json; names=['pyinstaller','websockets','altgraph','packaging','pefile','pyinstaller-hooks-contrib','pywin32-ctypes','setuptools']; print(json.dumps([{'name':n,'version':m.version(n),'license_expression':m.metadata(n).get('License-Expression'),'license_files':m.metadata(n).get_all('License-File',[])} for n in names],indent=2))" |
             Set-Content -LiteralPath (Join-Path $evidence 'python-build-distributions.json') -Encoding utf8
           if ($LASTEXITCODE -ne 0) { throw 'DISTRIBUTION_INVENTORY_FAILED' }
+          $pythonHome = (python -c "import sys; print(sys.base_prefix)").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $env:DOTNET_ROOT) { throw 'RUNTIME_NOTICE_PATH_FAILED' }
+          $runtimeNotices = @(
+            @{ Source = (Join-Path $pythonHome 'LICENSE.txt'); Name = 'python-license.txt' },
+            @{ Source = (Join-Path $env:DOTNET_ROOT 'LICENSE.txt'); Name = 'dotnet-license.txt' },
+            @{ Source = (Join-Path $env:DOTNET_ROOT 'ThirdPartyNotices.txt'); Name = 'dotnet-third-party-notices.txt' }
+          )
+          foreach ($notice in $runtimeNotices) {
+            if (Test-Path -LiteralPath $notice.Source -PathType Leaf) {
+              Copy-Item -LiteralPath $notice.Source -Destination (Join-Path $evidence $notice.Name)
+            } else {
+              Add-Content -LiteralPath (Join-Path $evidence 'missing-runtime-notices.txt') -Value $notice.Name
+            }
+          }
           Write-Output 'UNSIGNED_SYNTHETIC_BUILD=PASS; SIGNED_RELEASE=NOT_RUN; ARTIFACT_PUBLISHED=NO'
       - name: Upload build metadata only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
