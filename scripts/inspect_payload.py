@@ -52,6 +52,7 @@ def inspect_dotnet(data):
     pos += 40  # .NET 6+ deps, runtime config, and flags
     entries = []
     names = set()
+    runtime_config = None
     for _ in range(count):
         if pos + 25 > len(data):
             raise ValueError("truncated manifest")
@@ -65,8 +66,12 @@ def inspect_dotnet(data):
         if start < 0 or not 0 <= size <= MAX_ENTRY or compressed < 0 or stored > MAX_ENTRY or start + stored > offset:
             raise ValueError("invalid bundle entry")
         digest = hashlib.sha256(data[start:start + size]).hexdigest() if not compressed else None
+        if name.endswith(".runtimeconfig.json") and not compressed:
+            if runtime_config is not None or size > 1024 * 1024:
+                raise ValueError("invalid runtime configuration")
+            runtime_config = json.loads(data[start:start + size])
         entries.append({"name": name, "type": kind, "size": size, "compressed": compressed, "sha256": digest})
-    return {"format": f"{major}.{minor}", "entries": entries}
+    return {"format": f"{major}.{minor}", "runtime_config": runtime_config, "entries": entries}
 
 
 def inspect_worker(path, expected):

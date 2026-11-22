@@ -29,6 +29,10 @@ class BundleInspectionTests(unittest.TestCase):
     def test_compressed_entry_is_not_claimed_verified(self):
         self.assertIsNone(inspect_dotnet(bundle(compressed=2))["entries"][0]["sha256"])
 
+    def test_reads_runtime_configuration(self):
+        result = inspect_dotnet(bundle(b"app.runtimeconfig.json", b'{"runtimeOptions":{"tfm":"net10.0"}}'))
+        self.assertEqual(result["runtime_config"]["runtimeOptions"]["tfm"], "net10.0")
+
     def test_worker_reports_both_matching_and_mismatching_inputs(self):
         reader = types.ModuleType("PyInstaller.archive.readers")
 
