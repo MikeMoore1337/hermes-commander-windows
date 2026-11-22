@@ -8,7 +8,7 @@ import zipfile
 LIMIT = 2 * 1024 * 1024
 
 
-def assemble(repo: Path, python_home: Path, dotnet_root: Path, output: Path) -> None:
+def assemble(repo: Path, python_home: Path, dotnet_root: Path, runtime_pack: Path, output: Path) -> None:
     if output.exists():
         raise ValueError("notice output already exists")
     source = repo / "third_party_notices"
@@ -34,7 +34,9 @@ def assemble(repo: Path, python_home: Path, dotnet_root: Path, output: Path) -> 
     files = {"first-party/LICENSE.txt": repo / "LICENSE",
              "python-distribution/LICENSE.txt": python_home / "LICENSE.txt",
              "dotnet-distribution/LICENSE.txt": dotnet_root / "LICENSE.txt",
-             "dotnet-distribution/ThirdPartyNotices.txt": dotnet_root / "ThirdPartyNotices.txt"}
+             "dotnet-distribution/ThirdPartyNotices.txt": dotnet_root / "ThirdPartyNotices.txt",
+             "dotnet-runtimepack/LICENSE.TXT": runtime_pack / "LICENSE.TXT",
+             "dotnet-runtimepack/THIRD-PARTY-NOTICES.TXT": runtime_pack / "THIRD-PARTY-NOTICES.TXT"}
     for path in source.rglob("*"):
         if path.is_symlink() or path.is_junction():
             raise ValueError("symlink in source notices")
@@ -59,6 +61,6 @@ def assemble(repo: Path, python_home: Path, dotnet_root: Path, output: Path) -> 
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        raise SystemExit("expected repository, Python root, .NET root and new output")
+    if len(sys.argv) != 6:
+        raise SystemExit("expected repository, Python root, .NET root, runtime pack and new output")
     assemble(*(Path(arg) for arg in sys.argv[1:]))

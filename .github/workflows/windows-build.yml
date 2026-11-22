@@ -62,8 +62,17 @@ jobs:
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'dotnet-publish-files.json') -Encoding utf8
           $pythonHome = (python -c "import sys; print(sys.base_prefix)").Trim()
           if ($LASTEXITCODE -ne 0 -or -not $env:DOTNET_ROOT) { throw 'RUNTIME_NOTICE_PATH_FAILED' }
+          python -c "import json,sys; from pathlib import Path; from scripts.inspect_payload import inspect_dotnet; print(json.dumps(inspect_dotnet(Path(sys.argv[1]).read_bytes())['dependency_libraries']))" $service |
+            Set-Content -LiteralPath (Join-Path $evidence 'service-dependencies.json') -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw 'SERVICE_DEPENDENCIES_FAILED' }
+          $dependencies = Get-Content -Raw -LiteralPath (Join-Path $evidence 'service-dependencies.json') | ConvertFrom-Json
+          $pack = @($dependencies | Where-Object { $_ -cmatch '^runtimepack\.Microsoft\.NETCore\.App\.Runtime\.win-x64/[0-9.]+$' })
+          if ($pack.Count -ne 1) { throw 'RUNTIMEPACK_IDENTITY_MISSING' }
+          $packVersion = ($pack[0] -split '/')[1]
+          $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
+          $packDir = Join-Path (Join-Path $nugetRoot 'microsoft.netcore.app.runtime.win-x64') $packVersion
           $notices = Join-Path $out 'ThirdPartyNotices.zip'
-          python -B scripts/assemble_notices.py $env:GITHUB_WORKSPACE $pythonHome $env:DOTNET_ROOT $notices
+          python -B scripts/assemble_notices.py $env:GITHUB_WORKSPACE $pythonHome $env:DOTNET_ROOT $packDir $notices
           if ($LASTEXITCODE -ne 0) { throw 'NOTICE_ASSEMBLY_FAILED' }
           $probe = Start-Process -FilePath $service -ArgumentList @('--self-test', $env:GITHUB_SHA) -Wait -PassThru -NoNewWindow
           if ($probe.ExitCode -ne 0) { throw 'SERVICE_SELF_TEST_FAILED' }
@@ -133,17 +142,16 @@ jobs:
           python -B scripts/inspect_payload.py $serviceInMsi[0].FullName $workerInMsi[0].FullName (Join-Path $evidence 'python-native-inputs.json') (Join-Path $evidence 'embedded-payload.json')
           if ($LASTEXITCODE -ne 0) { throw 'EMBEDDED_PAYLOAD_INSPECTION_FAILED' }
           $payload = Get-Content -Raw -LiteralPath (Join-Path $evidence 'embedded-payload.json') | ConvertFrom-Json
-          $pack = @($payload.dotnet_bundle.dependency_libraries | Where-Object { $_ -cmatch '^runtimepack\.Microsoft\.NETCore\.App\.Runtime\.win-x64/[0-9.]+$' })
-          if ($pack.Count -ne 1) { throw 'RUNTIMEPACK_IDENTITY_MISSING' }
-          $packVersion = ($pack[0] -split '/')[1]
-          $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
-          $packDir = Join-Path (Join-Path $nugetRoot 'microsoft.netcore.app.runtime.win-x64') $packVersion
+          $extractedPack = @($payload.dotnet_bundle.dependency_libraries | Where-Object { $_ -cmatch '^runtimepack\.Microsoft\.NETCore\.App\.Runtime\.win-x64/[0-9.]+$' })
+          if ($extractedPack.Count -ne 1 -or $extractedPack[0] -cne $pack[0]) { throw 'RUNTIMEPACK_IDENTITY_MISMATCH' }
           $packNotices = @()
           if (Test-Path -LiteralPath $packDir -PathType Container) {
             $packNotices = @(Get-ChildItem -LiteralPath $packDir -File | Where-Object { $_.Name -match '^(LICENSE|THIRD.?PARTY.?NOTICES)' } | ForEach-Object {
               [pscustomobject]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant() }
             })
           }
+          Copy-Item -LiteralPath (Join-Path $packDir 'LICENSE.TXT') -Destination (Join-Path $evidence 'runtimepack-license.txt')
+          Copy-Item -LiteralPath (Join-Path $packDir 'THIRD-PARTY-NOTICES.TXT') -Destination (Join-Path $evidence 'runtimepack-third-party-notices.txt')
           [pscustomobject]@{ identity = $pack[0]; directory_found = (Test-Path -LiteralPath $packDir -PathType Container); notices = $packNotices } |
             ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $evidence 'dotnet-runtimepack-notices.json') -Encoding utf8
           $alone = Join-Path $env:RUNNER_TEMP 'h454-service-isolated-probe'

@@ -29,8 +29,8 @@ class NoticeArchiveTests(unittest.TestCase):
     def test_preserves_notice_bytes_and_requires_windows_crt_terms(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            repo, python, dotnet = (root / name for name in ("repo", "python", "dotnet"))
-            for directory in (repo, python, dotnet):
+            repo, python, dotnet, pack = (root / name for name in ("repo", "python", "dotnet", "pack"))
+            for directory in (repo, python, dotnet, pack):
                 directory.mkdir()
             for relative in ("python-3.14.10/LICENSE.txt", "python-3.14.10/license.rst", "python-3.14.10/crtlicense.txt", "openssl-3.5.9/LICENSE.txt", "xz-5.2.5/COPYING", "wheels/example-1-py3-none-any/LICENSE"):
                 p = repo / "third_party_notices" / relative
@@ -43,24 +43,32 @@ class NoticeArchiveTests(unittest.TestCase):
             (python / "LICENSE.txt").write_bytes(b"Microsoft Distributable Code\r\n")
             (dotnet / "LICENSE.txt").write_bytes(b"dotnet license")
             (dotnet / "ThirdPartyNotices.txt").write_bytes(b"dotnet notices")
+            (pack / "LICENSE.TXT").write_bytes(b"runtime pack license")
+            (pack / "THIRD-PARTY-NOTICES.TXT").write_bytes(b"runtime pack notices")
             output = root / "notices.zip"
-            assemble(repo, python, dotnet, output)
+            assemble(repo, python, dotnet, pack, output)
             with zipfile.ZipFile(output) as archive:
                 self.assertEqual(archive.read("upstream/openssl-3.5.9/LICENSE.txt"), b"original\r\n")
                 self.assertEqual(archive.read("python-distribution/LICENSE.txt"), b"Microsoft Distributable Code\r\n")
+                self.assertEqual(archive.read("dotnet-runtimepack/LICENSE.TXT"), b"runtime pack license")
             second = root / "notices-again.zip"
-            assemble(repo, python, dotnet, second)
+            assemble(repo, python, dotnet, pack, second)
             self.assertEqual(output.read_bytes(), second.read_bytes())
             with self.assertRaises(ValueError):
-                assemble(repo, python, dotnet, output)
+                assemble(repo, python, dotnet, pack, output)
             (repo / "third_party_notices/wheels/example-1-py3-none-any/LICENSE").unlink()
             with self.assertRaises(ValueError):
-                assemble(repo, python, dotnet, root / "missing-wheel.zip")
+                assemble(repo, python, dotnet, pack, root / "missing-wheel.zip")
             self.assertFalse((root / "missing-wheel.zip").exists())
             (python / "LICENSE.txt").write_bytes(b"missing CRT")
             (repo / "third_party_notices/wheels/example-1-py3-none-any/LICENSE").write_bytes(b"original\r\n")
             with self.assertRaises(ValueError):
-                assemble(repo, python, dotnet, root / "denied.zip")
+                assemble(repo, python, dotnet, pack, root / "denied.zip")
+            (python / "LICENSE.txt").write_bytes(b"Microsoft Distributable Code")
+            (pack / "THIRD-PARTY-NOTICES.TXT").unlink()
+            with self.assertRaises(ValueError):
+                assemble(repo, python, dotnet, pack, root / "missing-pack.zip")
+            self.assertFalse((root / "missing-pack.zip").exists())
 
 
 if __name__ == "__main__":
