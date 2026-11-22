@@ -36,3 +36,10 @@ that its worker and service match the just-built inputs, and inventories
 embedded .NET and PyInstaller files without uploading binaries. Input hashes,
 archive inventories and individual license texts are evidence for review;
 they do not themselves establish redistribution rights or provider approval.
+
+The test MSI now includes `ThirdPartyNotices.zip`, assembled from the pinned
+source notices and the installed Python and .NET license files. CI checks that
+the archive extracted from the MSI matches its build input. The .NET Library
+terms also place conditions on distribution, including end-user terms and
+indemnification. The notice archive alone does not satisfy or accept those
+conditions, establish complete native-DLL coverage, or approve a release.

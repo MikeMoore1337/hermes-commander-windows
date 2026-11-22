@@ -60,6 +60,11 @@ jobs:
           $service = Join-Path $out 'HermesCommanderNativeService.exe'
           @(Get-ChildItem -LiteralPath $out -File | ForEach-Object { [pscustomobject]@{ name = $_.Name; size = $_.Length } }) |
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'dotnet-publish-files.json') -Encoding utf8
+          $pythonHome = (python -c "import sys; print(sys.base_prefix)").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $env:DOTNET_ROOT) { throw 'RUNTIME_NOTICE_PATH_FAILED' }
+          $notices = Join-Path $out 'ThirdPartyNotices.zip'
+          python -B scripts/assemble_notices.py $env:GITHUB_WORKSPACE $pythonHome $env:DOTNET_ROOT $notices
+          if ($LASTEXITCODE -ne 0) { throw 'NOTICE_ASSEMBLY_FAILED' }
           $probe = Start-Process -FilePath $service -ArgumentList @('--self-test', $env:GITHUB_SHA) -Wait -PassThru -NoNewWindow
           if ($probe.ExitCode -ne 0) { throw 'SERVICE_SELF_TEST_FAILED' }
           $workerDir = Join-Path $env:RUNNER_TEMP 'h454-standalone-worker'
@@ -69,20 +74,18 @@ jobs:
           dotnet tool install wix --version 6.0.0 --tool-path $tools
           if ($LASTEXITCODE -ne 0) { throw 'WIX_INSTALL_FAILED' }
           $msi = Join-Path $out 'HermesCommanderNative-Disabled.msi'
-          & (Join-Path $tools 'wix.exe') build 'deploy/h454/native-windows-msi/Package.wxs' -arch x64 -d "ServiceExe=$service" -d "WorkerExe=$(Join-Path $workerDir 'HermesCommanderNativeWorker.exe')" -out $msi
+          & (Join-Path $tools 'wix.exe') build 'deploy/h454/native-windows-msi/Package.wxs' -arch x64 -d "ServiceExe=$service" -d "WorkerExe=$(Join-Path $workerDir 'HermesCommanderNativeWorker.exe')" -d "NoticesZip=$notices" -out $msi
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $msi -PathType Leaf)) { throw 'MSI_BUILD_FAILED' }
           if ((Get-AuthenticodeSignature -LiteralPath $msi).Status -ne 'NotSigned') { throw 'UNEXPECTED_MSI_SIGNATURE' }
           $worker = Join-Path $workerDir 'HermesCommanderNativeWorker.exe'
           & pyi-archive_viewer -b -r $worker | Set-Content -LiteralPath (Join-Path $evidence 'worker-archive-list.txt') -Encoding utf8
           if ($LASTEXITCODE -ne 0) { throw 'WORKER_INVENTORY_FAILED' }
-          Get-FileHash -Algorithm SHA256 -LiteralPath $service,$worker,$msi |
+          Get-FileHash -Algorithm SHA256 -LiteralPath $service,$worker,$notices,$msi |
             ForEach-Object { "$(Split-Path -Leaf $_.Path) $($_.Hash.ToLowerInvariant())" } |
             Set-Content -LiteralPath (Join-Path $evidence 'candidate-sha256.txt') -Encoding utf8
           python -c "import importlib.metadata as m,json; names=['pyinstaller','websockets','altgraph','packaging','pefile','pyinstaller-hooks-contrib','pywin32-ctypes','setuptools']; print(json.dumps([{'name':n,'version':m.version(n),'license_expression':m.metadata(n).get('License-Expression'),'license_files':m.metadata(n).get_all('License-File',[])} for n in names],indent=2))" |
             Set-Content -LiteralPath (Join-Path $evidence 'python-build-distributions.json') -Encoding utf8
           if ($LASTEXITCODE -ne 0) { throw 'DISTRIBUTION_INVENTORY_FAILED' }
-          $pythonHome = (python -c "import sys; print(sys.base_prefix)").Trim()
-          if ($LASTEXITCODE -ne 0 -or -not $env:DOTNET_ROOT) { throw 'RUNTIME_NOTICE_PATH_FAILED' }
           python -c "import json,ssl,sys; print(json.dumps({'python':sys.version.split()[0],'openssl':ssl.OPENSSL_VERSION},indent=2))" |
             Set-Content -LiteralPath (Join-Path $evidence 'python-runtime-versions.json') -Encoding utf8
           if ($LASTEXITCODE -ne 0) { throw 'RUNTIME_VERSION_FAILED' }
@@ -118,15 +121,31 @@ jobs:
           $files = @(Get-ChildItem -LiteralPath $extract -Recurse -File)
           $serviceInMsi = @($files | Where-Object { $_.Name -ceq 'HermesCommanderNativeService.exe' })
           $workerInMsi = @($files | Where-Object { $_.Name -ceq 'HermesCommanderNativeWorker.exe' })
-          if ($serviceInMsi.Count -ne 1 -or $workerInMsi.Count -ne 1 -or
+          $noticesInMsi = @($files | Where-Object { $_.Name -ceq 'ThirdPartyNotices.zip' })
+          if ($serviceInMsi.Count -ne 1 -or $workerInMsi.Count -ne 1 -or $noticesInMsi.Count -ne 1 -or
               (Get-FileHash -LiteralPath $serviceInMsi[0].FullName).Hash -cne (Get-FileHash -LiteralPath $service).Hash -or
-              (Get-FileHash -LiteralPath $workerInMsi[0].FullName).Hash -cne (Get-FileHash -LiteralPath $worker).Hash) {
+              (Get-FileHash -LiteralPath $workerInMsi[0].FullName).Hash -cne (Get-FileHash -LiteralPath $worker).Hash -or
+              (Get-FileHash -LiteralPath $noticesInMsi[0].FullName).Hash -cne (Get-FileHash -LiteralPath $notices).Hash) {
             throw 'MSI_PAYLOAD_MISMATCH'
           }
           @($files | ForEach-Object { [pscustomobject]@{name = [IO.Path]::GetRelativePath($extract, $_.FullName); sha256 = (Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant()} }) |
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'msi-admin-files.json') -Encoding utf8
           python -B scripts/inspect_payload.py $serviceInMsi[0].FullName $workerInMsi[0].FullName (Join-Path $evidence 'python-native-inputs.json') (Join-Path $evidence 'embedded-payload.json')
           if ($LASTEXITCODE -ne 0) { throw 'EMBEDDED_PAYLOAD_INSPECTION_FAILED' }
+          $payload = Get-Content -Raw -LiteralPath (Join-Path $evidence 'embedded-payload.json') | ConvertFrom-Json
+          $pack = @($payload.dotnet_bundle.dependency_libraries | Where-Object { $_ -cmatch '^runtimepack\.Microsoft\.NETCore\.App\.Runtime\.win-x64/[0-9.]+$' })
+          if ($pack.Count -ne 1) { throw 'RUNTIMEPACK_IDENTITY_MISSING' }
+          $packVersion = ($pack[0] -split '/')[1]
+          $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
+          $packDir = Join-Path (Join-Path $nugetRoot 'microsoft.netcore.app.runtime.win-x64') $packVersion
+          $packNotices = @()
+          if (Test-Path -LiteralPath $packDir -PathType Container) {
+            $packNotices = @(Get-ChildItem -LiteralPath $packDir -File | Where-Object { $_.Name -match '^(LICENSE|THIRD.?PARTY.?NOTICES)' } | ForEach-Object {
+              [pscustomobject]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant() }
+            })
+          }
+          [pscustomobject]@{ identity = $pack[0]; directory_found = (Test-Path -LiteralPath $packDir -PathType Container); notices = $packNotices } |
+            ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $evidence 'dotnet-runtimepack-notices.json') -Encoding utf8
           $alone = Join-Path $env:RUNNER_TEMP 'h454-service-isolated-probe'
           New-Item -ItemType Directory -Path $alone -ErrorAction Stop | Out-Null
           $isolatedExe = Join-Path $alone 'HermesCommanderNativeService.exe'

@@ -1,3 +1,5 @@
 third_party_notices/** -text
 # Preserve the original whitespace in third-party license texts.
 third_party_notices/wheels/** whitespace=cr-at-eol,-blank-at-eol
+third_party_notices/python-3.14.10/** whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof
+third_party_notices/xz-5.2.5/** whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof

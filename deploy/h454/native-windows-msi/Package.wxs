@@ -28,6 +28,7 @@
         <File Id="HermesCommanderNativeServiceExe" Source="$(var.ServiceExe)"
               KeyPath="yes" />
         <File Id="HermesCommanderNativeWorkerExe" Source="$(var.WorkerExe)" />
+        <File Id="HermesCommanderLicenseNotices" Source="$(var.NoticesZip)" />
         <ServiceInstall Id="NativeService"
                         Name="HermesCommanderNative"
                         DisplayName="Hermes Commander Native (disabled)"
