@@ -32,7 +32,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'VENV_FAILED' }
           $env:PATH = "$(Join-Path $venv 'Scripts');$env:PATH"
           $wheels = Join-Path $env:RUNNER_TEMP 'h454-build-wheels'
-          python -m pip download --disable-pip-version-check --no-cache-dir --no-deps --only-binary=:all: --index-url https://pypi.org/simple --dest $wheels 'pyinstaller==6.22.3' 'websockets==17.2' 'altgraph==0.17.5' 'packaging==26.3' 'pefile==2024.8.26' 'pyinstaller-hooks-contrib==2026.10' 'pywin32-ctypes==0.2.3' 'setuptools==84.2.1'
+          python -m pip download --disable-pip-version-check --no-cache-dir --no-deps --require-hashes --only-binary=:all: --index-url https://pypi.org/simple --dest $wheels -r requirements-windows-build.txt
           if ($LASTEXITCODE -ne 0) { throw 'WHEEL_DOWNLOAD_FAILED' }
           python -B scripts/audit_build_wheels.py $wheels (Join-Path $evidence 'wheel-notices')
           if ($LASTEXITCODE -ne 0) { throw 'WHEEL_AUDIT_FAILED' }

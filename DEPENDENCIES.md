@@ -16,7 +16,8 @@ This is a preliminary list, not an SBOM or permission to redistribute the
 output. Exact transitive packages, embedded files and required notices must be
 established from the actual build before publication or signing. In particular,
 the SignPath system-library exception for the Windows .NET distribution has not
-been determined. The workflow records hashes and exact notice files from the
-wheelhouse used in its isolated build, but that evidence does not establish
+been determined. The workflow verifies the committed wheel hashes and records
+exact notice files from the wheelhouse used in its isolated build, but that
+evidence does not establish
 completeness for Python, .NET or native DLLs. It does not sign or publish its
 binary output.
