@@ -40,6 +40,17 @@ The report also compares embedded DLL hashes with the runtime pack and the
 PyInstaller analysis inputs. A missing or unmatched source remains unknown;
 matching bytes alone do not determine license terms.
 
+In [Windows CI run 45065924090](https://github.com/MikeMoore1337/hermes-commander-windows/actions/runs/45065924090)
+for source head `9779e4f3e45e6dc20a9d31bcc062cd559e293c1a`, all 67 worker
+DLL/PYD files matched analysis inputs. Of these, 43 Windows API/CRT files matched
+the hosted runner tool cache and had valid Microsoft Corporation Authenticode
+signatures; 23 files from Python's input directory had valid signatures from
+Python Software Foundation (21) or Microsoft Windows (2). The BSD-licensed
+`websockets` native extension was not signed. The service contained 173 DLLs:
+172 matched runtime pack `10.0.15`; the remaining DLL was named for this service.
+These observations are specific to that build and runner trust store, and do
+not establish SignPath eligibility or a trusted signature on the installer.
+
 The test MSI now includes `ThirdPartyNotices.zip`, assembled from the pinned
 source notices, installed Python and .NET SDK notices, and the exact runtime
 pack identified inside the service bundle. CI checks that the archive extracted
