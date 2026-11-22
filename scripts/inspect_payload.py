@@ -6,6 +6,7 @@ import os
 from pathlib import Path, PurePosixPath
 import struct
 import sys
+import zlib
 
 MAX_BINARY = 256 * 1024 * 1024
 MAX_ENTRY = 128 * 1024 * 1024
@@ -85,22 +86,46 @@ def inspect_dotnet(data):
             "dependency_libraries": dependency_libraries, "entries": entries}
 
 
+def _worker_bytes(reader, entry):
+    offset, stored, unpacked, compressed, _ = entry
+    start = reader._start_offset + offset
+    size = Path(reader._filename).stat().st_size
+    if offset < 0 or stored < 0 or stored > MAX_ENTRY or compressed not in (0, 1) or start < 0 or start + stored > size:
+        raise ValueError("invalid worker entry bounds")
+    with open(reader._filename, "rb") as source:
+        source.seek(start)
+        data = source.read(stored)
+    if compressed:
+        inflater = zlib.decompressobj()
+        data = inflater.decompress(data, unpacked + 1)
+        if not inflater.eof or inflater.unused_data or inflater.unconsumed_tail:
+            raise ValueError("invalid compressed worker entry")
+    if len(data) != unpacked:
+        raise ValueError("invalid worker entry size")
+    return data
+
+
 def inspect_worker(path, expected, extracted=None):
     from PyInstaller.archive.readers import CArchiveReader
 
     reader = CArchiveReader(str(path))
+    if len(reader.toc) > 4096:
+        raise ValueError("too many worker entries")
     if extracted is not None:
         extracted.mkdir()
     entries = []
-    for name, (_, _, unpacked, _, kind) in reader.toc.items():
+    total = 0
+    for name, entry in reader.toc.items():
+        _, _, unpacked, _, kind = entry
         safe = _safe_name(name)
         if not safe.lower().endswith((".dll", ".pyd")):
             continue
         if not 0 <= unpacked <= MAX_ENTRY:
             raise ValueError("unsafe worker entry")
-        content = reader.extract(name)
-        if len(content) != unpacked:
-            raise ValueError("invalid worker entry size")
+        total += unpacked
+        if total > MAX_BINARY:
+            raise ValueError("worker entries too large")
+        content = _worker_bytes(reader, entry)
         digest = hashlib.sha256(content).hexdigest()
         if extracted is not None:
             output = extracted / (digest + Path(safe).suffix.lower())
