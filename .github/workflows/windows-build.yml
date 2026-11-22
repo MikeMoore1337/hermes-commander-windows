@@ -25,6 +25,19 @@ jobs:
           $ErrorActionPreference = 'Stop'
           python -B -m unittest discover -s tests -v
           if ($LASTEXITCODE -ne 0) { throw 'BOUNDARY_TESTS_FAILED' }
+          $evidence = Join-Path $env:RUNNER_TEMP 'h454-build-evidence'
+          New-Item -ItemType Directory -Path $evidence -ErrorAction Stop | Out-Null
+          $venv = Join-Path $env:RUNNER_TEMP 'h454-build-venv'
+          python -m venv $venv
+          if ($LASTEXITCODE -ne 0) { throw 'VENV_FAILED' }
+          $env:PATH = "$(Join-Path $venv 'Scripts');$env:PATH"
+          $wheels = Join-Path $env:RUNNER_TEMP 'h454-build-wheels'
+          python -m pip download --disable-pip-version-check --no-cache-dir --no-deps --only-binary=:all: --index-url https://pypi.org/simple --dest $wheels 'pyinstaller==6.22.3' 'websockets==17.2' 'altgraph==0.17.5' 'packaging==26.3' 'pefile==2024.8.26' 'pyinstaller-hooks-contrib==2026.10' 'pywin32-ctypes==0.2.3' 'setuptools==84.2.1'
+          if ($LASTEXITCODE -ne 0) { throw 'WHEEL_DOWNLOAD_FAILED' }
+          python -B scripts/audit_build_wheels.py $wheels (Join-Path $evidence 'wheel-notices')
+          if ($LASTEXITCODE -ne 0) { throw 'WHEEL_AUDIT_FAILED' }
+          $env:PIP_NO_INDEX = '1'
+          $env:PIP_FIND_LINKS = $wheels
           $out = Join-Path $env:RUNNER_TEMP 'h454-standalone-service'
           dotnet publish 'deploy/h454/native-windows-service/HermesCommanderNativeService.csproj' --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false "-p:SourceRevisionId=$env:GITHUB_SHA" -o $out
           if ($LASTEXITCODE -ne 0) { throw 'SERVICE_BUILD_FAILED' }
@@ -41,8 +54,6 @@ jobs:
           & (Join-Path $tools 'wix.exe') build 'deploy/h454/native-windows-msi/Package.wxs' -arch x64 -d "ServiceExe=$service" -d "WorkerExe=$(Join-Path $workerDir 'HermesCommanderNativeWorker.exe')" -out $msi
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $msi -PathType Leaf)) { throw 'MSI_BUILD_FAILED' }
           if ((Get-AuthenticodeSignature -LiteralPath $msi).Status -ne 'NotSigned') { throw 'UNEXPECTED_MSI_SIGNATURE' }
-          $evidence = Join-Path $env:RUNNER_TEMP 'h454-build-evidence'
-          New-Item -ItemType Directory -Path $evidence -ErrorAction Stop | Out-Null
           $worker = Join-Path $workerDir 'HermesCommanderNativeWorker.exe'
           & pyi-archive_viewer -b -r $worker | Set-Content -LiteralPath (Join-Path $evidence 'worker-archive-list.txt') -Encoding utf8
           if ($LASTEXITCODE -ne 0) { throw 'WORKER_INVENTORY_FAILED' }
