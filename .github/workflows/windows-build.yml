@@ -68,6 +68,9 @@ jobs:
           python -c "import json,ssl,sys; print(json.dumps({'python':sys.version.split()[0],'openssl':ssl.OPENSSL_VERSION},indent=2))" |
             Set-Content -LiteralPath (Join-Path $evidence 'python-runtime-versions.json') -Encoding utf8
           if ($LASTEXITCODE -ne 0) { throw 'RUNTIME_VERSION_FAILED' }
+          python -c "import ssl; assert ssl.OPENSSL_VERSION_INFO[:3] == (3,5,9)"
+          if ($LASTEXITCODE -ne 0) { throw 'OPENSSL_VERSION_CHANGED_REVIEW_NOTICE' }
+          Copy-Item -LiteralPath 'third_party_notices/openssl-3.5.9/LICENSE.txt' -Destination (Join-Path $evidence 'openssl-license.txt')
           $nativeInputs = @('python314.dll', 'vcruntime140.dll', 'vcruntime140_1.dll', 'DLLs\libcrypto-3.dll', 'DLLs\libssl-3.dll', 'DLLs\libffi-8.dll')
           $nativeRecords = foreach ($name in $nativeInputs) {
             $file = Join-Path $pythonHome $name
