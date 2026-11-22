@@ -143,7 +143,12 @@ def map_worker_sources(entries, toc_text, roots):
             path = Path(raw)
             try:
                 resolved = path.resolve(strict=True)
-                category = next((label for label, root in roots if resolved.is_relative_to(root.resolve())), None)
+                match = next(((label, root) for label, root in roots if resolved.is_relative_to(root.resolve())), None)
+                category = match[0] if match else None
+                if category == "runner_tool_cache":
+                    relative = resolved.relative_to(match[1].resolve())
+                    family = relative.parts[0].casefold() if relative.parts else "other"
+                    category += "/" + (family if family in {"python", "dotnet", "msvc", "windows"} else "other")
                 if not category:
                     top = resolved.parts[1].casefold() if len(resolved.parts) > 1 else "unknown"
                     known = {"windows", "users", "program files", "program files (x86)",
@@ -198,6 +203,8 @@ def main(service, worker, inputs, toc, pack_dir, output):
                        ("ProgramFiles(x86)", "program_files_x86"), ("RUNNER_TEMP", "runner_temp")):
         if os.environ.get(key):
             roots.append((label, Path(os.environ[key])))
+    if os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted" and os.environ.get("RUNNER_TOOL_CACHE"):
+        roots.append(("runner_tool_cache", Path(os.environ["RUNNER_TOOL_CACHE"])))
     report["worker"]["source_comparisons"] = map_worker_sources(
         report["worker"]["entries"], Path(toc).read_text(encoding="utf-8"), roots)
     report["dotnet_bundle"]["pack_comparisons"] = map_dotnet_sources(

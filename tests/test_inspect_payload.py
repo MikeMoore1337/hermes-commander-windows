@@ -74,6 +74,7 @@ class BundleInspectionTests(unittest.TestCase):
             toc = repr(([('input.dll', str(source), 'BINARY')],))
             mapped = map_worker_sources(entries, toc, [("python", allowed)])
             self.assertEqual(mapped[0]["matching_sources"], ["python"])
+            self.assertEqual(map_worker_sources(entries, toc, [("runner_tool_cache", allowed)])[0]["matching_sources"], ["runner_tool_cache/other"])
             self.assertEqual(mapped[1]["matching_sources"], [])
             self.assertEqual(map_worker_sources(entries, toc, [("other", root / "elsewhere")])[0]["matching_sources"], [])
             self.assertEqual(map_worker_sources(entries, toc, [("other", root / "elsewhere")])[0]["diagnostics"][0]["status"], "not-read")
