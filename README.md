@@ -3,8 +3,9 @@
 This source snapshot contains the owner's Windows read-only native worker,
 disabled service and installer sources. It is derived from Hermes commit
 `13584072697c901ae1da575dee2898cfee890779`; the copied file hashes were
-checked against the owner's Windows source inventory. The source is provided
-under the MIT license in `LICENSE`. `SOURCE-PROVENANCE.json` records the
+checked against the owner's Windows source inventory. First-party source is
+provided under the MIT license in `LICENSE`; notices in `third_party_notices`
+retain their own terms. `SOURCE-PROVENANCE.json` records the
 original Git blob identifiers for the initial snapshot.
 
 This is a development snapshot, not a signed release. The installer is designed

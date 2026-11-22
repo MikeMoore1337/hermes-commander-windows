@@ -1,0 +1,60 @@
+[
+  {
+    "wheel": "altgraph-0.17.5-py2.py3-none-any.whl",
+    "sha256": "f3a22400bce1b0c701683820ac4f3b159cd301acab067c51c653e06961600597",
+    "license_paths": [
+      "altgraph-0.17.5.dist-info/LICENSE"
+    ]
+  },
+  {
+    "wheel": "packaging-26.3-py3-none-any.whl",
+    "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+    "license_paths": [
+      "packaging-26.3.dist-info/licenses/LICENSE",
+      "packaging-26.3.dist-info/licenses/LICENSE.APACHE",
+      "packaging-26.3.dist-info/licenses/LICENSE.BSD"
+    ]
+  },
+  {
+    "wheel": "pefile-2024.8.26-py3-none-any.whl",
+    "sha256": "76f8b485dcd3b1bb8166f1128d395fa3d87af26360c2358fb75b80019b957c6f",
+    "license_paths": [
+      "pefile-2024.8.26.dist-info/LICENSE"
+    ]
+  },
+  {
+    "wheel": "pyinstaller-6.22.3-py3-none-win_amd64.whl",
+    "sha256": "500bd58c7bf7e584a8435adccbd763a0b918d5c12b08d74ff50fd79b2915458b",
+    "license_paths": [
+      "pyinstaller-6.22.3.dist-info/licenses/COPYING.txt"
+    ]
+  },
+  {
+    "wheel": "pyinstaller_hooks_contrib-2026.10-py3-none-any.whl",
+    "sha256": "dfc3cde20a7ce6c92e803016e66eed4b7050467e2c5f886a3745d89b258c6d6d",
+    "license_paths": [
+      "pyinstaller_hooks_contrib-2026.10.dist-info/licenses/LICENSE"
+    ]
+  },
+  {
+    "wheel": "pywin32_ctypes-0.2.3-py3-none-any.whl",
+    "sha256": "8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8",
+    "license_paths": [
+      "pywin32_ctypes-0.2.3.dist-info/LICENSE.txt"
+    ]
+  },
+  {
+    "wheel": "setuptools-84.2.1-py3-none-any.whl",
+    "sha256": "ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2",
+    "license_paths": [
+      "setuptools-84.2.1.dist-info/licenses/LICENSE"
+    ]
+  },
+  {
+    "wheel": "websockets-17.2-cp314-cp314-win_amd64.whl",
+    "sha256": "dac93bf7a9beb215be3282b8441173cd50806c41c007b8be9bb24e03c60ad563",
+    "license_paths": [
+      "websockets-17.2.dist-info/licenses/LICENSE"
+    ]
+  }
+]

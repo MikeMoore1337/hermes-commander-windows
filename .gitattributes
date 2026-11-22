@@ -1,0 +1,3 @@
+third_party_notices/** -text
+# Preserve the original whitespace in third-party license texts.
+third_party_notices/wheels/** whitespace=cr-at-eol,-blank-at-eol
